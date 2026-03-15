@@ -86,7 +86,11 @@ void motor_b_set (int speed){
 	        TIM5->CCR4 = 0;
 	    }
 }
+//forward is 0 degrees, right is 90 deg, left is -90 deg
+//speed is -100 to 100.
+void drive_around (int angle, int speed){
 
+}
 /* USER CODE END 0 */
 
 /**
