@@ -18,10 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stdio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdio.h"
 
 /* USER CODE END Includes */
 
@@ -186,7 +186,8 @@ int main(void)
   uint8_t opr_mode = 0b1000;
   uint8_t roll_low = 0x1C;
   HAL_I2C_Master_Transmit(&hi2c1, 0x28<<1,
-  			(uint8_t[]){0x3D,opr_mode}, 1, HAL_MAX_DELAY);
+  			(uint8_t[]){0x3D,opr_mode}, 2, HAL_MAX_DELAY);
+  HAL_Delay(650); //needs 650ms
   while (1)
   {
     /* USER CODE END WHILE */
@@ -194,10 +195,27 @@ int main(void)
     /* USER CODE BEGIN 3 */
 //	  test_motor_set();
 //	  test_drive();
-	  HAL_I2C_Master_Receive(&hi2c1, 0x28<<1,
-	    			(uint8_t[]){roll_low,data}, 2, HAL_MAX_DELAY);
-	  printf("hello");
-	  HAL_Delay(1000);
+	  HAL_I2C_Mem_Read(&hi2c1, 0x28<<1, roll_low, I2C_MEMADD_SIZE_8BIT,
+	                   data, 2, HAL_MAX_DELAY);
+	  HAL_StatusTypeDef status = HAL_I2C_Mem_Read(&hi2c1, 0x28<<1, roll_low,
+	      I2C_MEMADD_SIZE_8BIT, data, 2, HAL_MAX_DELAY);
+
+//	  if (status != HAL_OK) {
+//	      HAL_I2C_DeInit(&hi2c1);
+//	      HAL_Delay(10);
+//	      HAL_I2C_Init(&hi2c1);
+//	      HAL_Delay(10);
+//	      // re-send operating mode
+//	      HAL_I2C_Master_Transmit(&hi2c1, 0x28<<1,
+//	          (uint8_t[]){0x3D, opr_mode}, 2, HAL_MAX_DELAY);
+//	      HAL_Delay(700);
+//	      continue;
+//	  }
+
+	  int16_t raw = (int16_t)(data[1] << 8 | data[0]);
+	  printf("roll: %.2f deg\n", raw / 16.0f);
+
+	  HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
@@ -473,6 +491,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 #ifdef __GNUC__
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
 #else
@@ -483,6 +502,7 @@ PUTCHAR_PROTOTYPE
   HAL_UART_Transmit(&hlpuart1, (uint8_t *)&ch, 1, 0xFFFF);
   return ch;
 }
+
 /* USER CODE END 4 */
 
 /**
