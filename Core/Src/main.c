@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stdio.h"
+#include "BNO055_STM32.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -136,10 +137,10 @@ void drive (int w, int speed){
 	motor_b_set(speed+w*robot_width);
 }
 void test_drive (){
-	drive(0, 50);
-	HAL_Delay(2000);
-	drive(300, 0);
-	HAL_Delay(2000);
+	drive(0, 10);
+	HAL_Delay(500);
+	drive(100, 0);
+	HAL_Delay(500);
 }
 /* USER CODE END 0 */
 
@@ -178,16 +179,24 @@ int main(void)
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
 
+  BNO055_Init_t bno_init = {
+      .Unit_Sel    = UNIT_ORI_WINDOWS | UNIT_EUL_DEG | UNIT_GYRO_DPS | UNIT_ACC_MS2 | UNIT_TEMP_CELCIUS,
+      .Axis        = DEFAULT_AXIS_REMAP,
+      .Axis_sign   = DEFAULT_AXIS_SIGN,
+      .Mode        = BNO055_NORMAL_MODE,
+      .OP_Modes    = IMU,
+      .Clock_Source = CLOCK_INTERNAL,
+      .ACC_Range   = Range_4G
+  };
+  BNO055_Init(bno_init);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint8_t data[2];
-  uint8_t opr_mode = 0b1000;
-  uint8_t roll_low = 0x1C;
-  HAL_I2C_Master_Transmit(&hi2c1, 0x28<<1,
-  			(uint8_t[]){0x3D,opr_mode}, 2, HAL_MAX_DELAY);
-  HAL_Delay(650); //needs 650ms
+  BNO055_Sensors_t sensors_old = {0};
+  BNO055_Sensors_t sensors = {0};
+  int null_thresh= 0.
   while (1)
   {
     /* USER CODE END WHILE */
@@ -195,27 +204,12 @@ int main(void)
     /* USER CODE BEGIN 3 */
 //	  test_motor_set();
 //	  test_drive();
-	  HAL_I2C_Mem_Read(&hi2c1, 0x28<<1, roll_low, I2C_MEMADD_SIZE_8BIT,
-	                   data, 2, HAL_MAX_DELAY);
-	  HAL_StatusTypeDef status = HAL_I2C_Mem_Read(&hi2c1, 0x28<<1, roll_low,
-	      I2C_MEMADD_SIZE_8BIT, data, 2, HAL_MAX_DELAY);
+	  ReadData(&sensors, SENSOR_EULER | SENSOR_LINACC);
+	  if (sensors.Euler.Z > sensors_old.Euler.Z + 100) sensors.Euler.Z = sensors_old.Euler.Z;
+	  printf("pitch: %.2f deg, x-pos: %.4f m\n", sensors.Euler.Z, sensors.LineerAcc.X);
 
-//	  if (status != HAL_OK) {
-//	      HAL_I2C_DeInit(&hi2c1);
-//	      HAL_Delay(10);
-//	      HAL_I2C_Init(&hi2c1);
-//	      HAL_Delay(10);
-//	      // re-send operating mode
-//	      HAL_I2C_Master_Transmit(&hi2c1, 0x28<<1,
-//	          (uint8_t[]){0x3D, opr_mode}, 2, HAL_MAX_DELAY);
-//	      HAL_Delay(700);
-//	      continue;
-//	  }
-
-	  int16_t raw = (int16_t)(data[1] << 8 | data[0]);
-	  printf("roll: %.2f deg\n", raw / 16.0f);
-
-	  HAL_Delay(500);
+//	  HAL_Delay(100);
+	  sensors_old=sensors;
   }
   /* USER CODE END 3 */
 }
