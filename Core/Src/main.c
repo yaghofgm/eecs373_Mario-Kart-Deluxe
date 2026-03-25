@@ -18,12 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stdio.h"
-#include "BNO055_STM32.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "BNO055_STM32.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,6 +40,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef hlpuart1;
@@ -57,6 +58,7 @@ static void MX_GPIO_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_LPUART1_UART_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -129,18 +131,47 @@ void test_motor_set (){
 	HAL_Delay(2000);
 
 }
-
 //w is rad per sec, w=0 straight, w>0 is go to left, and w<0 is go to right
 //speed is -100 to 100.
 void drive (int w, int speed){
 	motor_a_set(speed-w*robot_width);
 	motor_b_set(speed+w*robot_width);
 }
-void test_drive (){
-	drive(0, 10);
+void test_drive (void){
+	drive(0, 20);
 	HAL_Delay(500);
-	drive(100, 0);
+	drive(200, 0);
 	HAL_Delay(500);
+}
+int32_t read_IMU (){
+	static BNO055_Sensors_t sensors = {0};
+	static BNO055_Sensors_t sensors_old = {0};
+	ReadData(&sensors, SENSOR_EULER | SENSOR_LINACC);
+	if (sensors.Euler.Z > sensors_old.Euler.Z + 100) sensors.Euler.Z = sensors_old.Euler.Z;
+	sensors_old=sensors;
+	return (int32_t)sensors.Euler.Z;
+}
+void test_IMU (){
+	  printf("pitch: %ld deg\n", read_IMU());
+}
+// Returns -4 to 27 based on scaled down and offset Raw 12-bit ADC value (0–4095) from PB0 / ADC1_IN15
+int32_t read_adc(void) {
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+    return (int32_t)(2750-HAL_ADC_GetValue(&hadc1))/100;
+}
+void test_read_adc(void){
+	printf("joystick data: %ld\n", read_adc() );
+}
+void test_adc_IMU(void){
+	printf("pitch: %ld deg, joystick data: %ld\n", read_IMU(), read_adc());
+}
+void drive_controller (){
+	int32_t speed = read_adc()*4;
+	int32_t w_speed = read_IMU()*4;
+	drive(w_speed,speed);
+	printf("speed: %ld , ang_speed: %ld\n", speed, w_speed);
+//	HAL_Delay(500);
 }
 /* USER CODE END 0 */
 
@@ -175,9 +206,11 @@ int main(void)
   MX_TIM5_Init();
   MX_I2C1_Init();
   MX_LPUART1_UART_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
+  HAL_ADC_Start(&hadc1);
 
   BNO055_Init_t bno_init = {
       .Unit_Sel    = UNIT_ORI_WINDOWS | UNIT_EUL_DEG | UNIT_GYRO_DPS | UNIT_ACC_MS2 | UNIT_TEMP_CELCIUS,
@@ -194,9 +227,9 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  BNO055_Sensors_t sensors_old = {0};
-  BNO055_Sensors_t sensors = {0};
-  int null_thresh= 0.
+//  BNO055_Sensors_t sensors_old = {0};
+//  BNO055_Sensors_t sensors = {0};
+//  int null_thresh= 0.
   while (1)
   {
     /* USER CODE END WHILE */
@@ -204,12 +237,10 @@ int main(void)
     /* USER CODE BEGIN 3 */
 //	  test_motor_set();
 //	  test_drive();
-	  ReadData(&sensors, SENSOR_EULER | SENSOR_LINACC);
-	  if (sensors.Euler.Z > sensors_old.Euler.Z + 100) sensors.Euler.Z = sensors_old.Euler.Z;
-	  printf("pitch: %.2f deg, x-pos: %.4f m\n", sensors.Euler.Z, sensors.LineerAcc.X);
-
-//	  HAL_Delay(100);
-	  sensors_old=sensors;
+//	  test_IMU();
+//	  test_read_adc();
+//	  test_adc_IMU();
+	  drive_controller();
   }
   /* USER CODE END 3 */
 }
@@ -236,7 +267,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_8;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -259,6 +290,64 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_15;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
   * @brief I2C1 Initialization Function
   * @param None
   * @retval None
@@ -274,7 +363,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x00100D14;
+  hi2c1.Init.Timing = 0x00503D58;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -374,7 +463,7 @@ static void MX_TIM5_Init(void)
 
   /* USER CODE END TIM5_Init 1 */
   htim5.Instance = TIM5;
-  htim5.Init.Prescaler = 799;
+  htim5.Init.Prescaler = 3199;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim5.Init.Period = 99;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
