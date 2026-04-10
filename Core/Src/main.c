@@ -265,8 +265,10 @@ int main(void)
       .ACC_Range   = Range_4G
   };
   BNO055_Init(bno_init);
-  ST7789_Init(); //if module disconnected, it wont get to the while.
+//  ST7789_Init(); //if module disconnected, it wont get to the while.
   ws2812_init(&htim2);
+
+//  ws2812_set_pixel(0,255,255,255);
 
   ws2812_set_pixel(0, 255, 0,   0);   // red
   ws2812_set_pixel(1, 0,   255, 0);   // green
@@ -294,13 +296,13 @@ int main(void)
 //	  test_adc_IMU();
 //	  drive_controller();
 //	  ST7789_Test();
-	  for (int i=0; i<9; i++){
-		  Scoreboard_Update(1);
-		  HAL_Delay(1000);
-		  Scoreboard_Update(2);
-		  HAL_Delay(1000);
-	  }
-	  Scoreboard_Update(0);
+//	  for (int i=0; i<9; i++){
+//		  Scoreboard_Update(1);
+//		  HAL_Delay(1000);
+//		  Scoreboard_Update(2);
+//		  HAL_Delay(1000);
+//	  }
+//	  Scoreboard_Update(0);
   }
   /* USER CODE END 3 */
 }

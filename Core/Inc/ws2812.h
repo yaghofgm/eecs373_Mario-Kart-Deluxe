@@ -4,11 +4,13 @@
 #include "stm32l4xx_hal.h"
 #include <stdint.h>
 
-#define NUM_LEDS     10          // change to your strip length
+#define NUM_LEDS     1          // change to your strip length
 #define RESET_PULSES 60          // 60 × 1.25µs = 75µs > 50µs reset
 
-#define T1H  13
-#define T0H   6
+#define T0H  6 //about 0.35 us, is 0.375 us
+#define T1H  14 //about 0.937 us, is 0.937 us
+//for the resets, it should be all zeros
+//#define TRH 0
 
 // Total DMA buffer: 24 bits per LED + reset
 #define DMA_BUF_SIZE (NUM_LEDS * 24 + RESET_PULSES)

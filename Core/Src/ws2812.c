@@ -16,7 +16,7 @@ void ws2812_set_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
     if (index >= NUM_LEDS) return;
 
     uint8_t colors[3] = {g, r, b};  // GRB order!
-    uint16_t *p = &dma_buf[index * 24]; //get to the dma position of the current led. do the g, then r, then b
+    uint32_t *p = &dma_buf[index * 24]; //get to the dma position of the current led. do the g, then r, then b
 
     for (int c = 0; c < 3; c++) {
         for (int bit = 7; bit >= 0; bit--) {
@@ -27,7 +27,7 @@ void ws2812_set_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
 
 void ws2812_show(void) {
     // Reset pulses at the end — CCR=0 means line stays low
-    memset(&dma_buf[NUM_LEDS * 24], 0, RESET_PULSES * sizeof(uint16_t));
+    memset(&dma_buf[NUM_LEDS * 24], 0, RESET_PULSES * sizeof(uint32_t));
 
     HAL_TIM_PWM_Start_DMA( //?????
         _htim,
