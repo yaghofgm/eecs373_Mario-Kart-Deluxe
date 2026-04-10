@@ -36,3 +36,22 @@ void ws2812_show(void) {
         DMA_BUF_SIZE
     );
 }
+
+void doStar(){
+	static int m = 0;
+	for (int i=0; i<15; i++){
+		int k=(m+i)%15;
+		switch(i%5)
+		{
+		case 0: ws2812_set_pixel(k, 255,   0,   0); break; // red         (  0°)
+		case 1: ws2812_set_pixel(k, 200, 255,   0); break; // chartreuse  ( 72°)
+		case 2: ws2812_set_pixel(k,   0, 255, 150); break; // spring green(144°)
+		case 3: ws2812_set_pixel(k,   0, 100, 255); break; // azure blue  (216°)
+		case 4: ws2812_set_pixel(k,  50,   0, 255); break; // violet      (288°)
+		}
+	}
+	ws2812_show();
+	HAL_Delay(50);
+	m = (m+1) % 15;
+}
+

@@ -4,7 +4,7 @@
 #include "stm32l4xx_hal.h"
 #include <stdint.h>
 
-#define NUM_LEDS     1          // change to your strip length
+#define NUM_LEDS     15          // change to your strip length
 #define RESET_PULSES 60          // 60 × 1.25µs = 75µs > 50µs reset
 
 #define T0H  6 //about 0.35 us, is 0.375 us
@@ -18,5 +18,6 @@
 void ws2812_init(TIM_HandleTypeDef *htim);
 void ws2812_set_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
 void ws2812_show(void);
+void doStar(void);
 
 #endif

@@ -212,7 +212,6 @@ void Scoreboard_Update(int player)
 	// Player 2 — blue, right half
 	DrawCharScaled(196, 68, '0' + score2, Font_16x26, 4, BLUE, BLACK);
 }
-
 /* USER CODE END 0 */
 
 /**
@@ -270,11 +269,11 @@ int main(void)
 
 //  ws2812_set_pixel(0,255,255,255);
 
-  ws2812_set_pixel(0, 255, 0,   0);   // red
-  ws2812_set_pixel(1, 0,   255, 0);   // green
-  ws2812_set_pixel(2, 0,   0,   255); // blue
-
-  ws2812_show();
+//  ws2812_set_pixel(0, 200, 0,   0);   // red
+//  ws2812_set_pixel(1, 0,   200, 0);   // green
+//  ws2812_set_pixel(2, 0,   0,   255); // blue
+//
+//  ws2812_show();
 
 
   /* USER CODE END 2 */
@@ -303,6 +302,7 @@ int main(void)
 //		  HAL_Delay(1000);
 //	  }
 //	  Scoreboard_Update(0);
+	  doStar();
   }
   /* USER CODE END 3 */
 }
