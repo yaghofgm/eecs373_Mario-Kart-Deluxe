@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "BNO055_STM32.h"
 #include "st7789.h"
+#include "ws2812.h"
 #include "fonts.h"
 #include <stdio.h>
 /* USER CODE END Includes */
@@ -34,6 +35,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define led_ARR 19
+#define led_T1H 13
+#define led_T0H 6
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,7 +55,9 @@ UART_HandleTypeDef hlpuart1;
 SPI_HandleTypeDef hspi2;
 DMA_HandleTypeDef hdma_spi2_tx;
 
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
+DMA_HandleTypeDef hdma_tim2_ch3;
 
 /* USER CODE BEGIN PV */
 static float robot_width=0.1; //10cm
@@ -66,6 +72,7 @@ static void MX_I2C1_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -190,7 +197,6 @@ static void DrawCharScaled(uint16_t x, uint16_t y, char ch, FontDef font, uint8_
 		}
 	}
 }
-
 void Scoreboard_Update(int player)
 {
 	static uint8_t score1 = 0;
@@ -206,6 +212,7 @@ void Scoreboard_Update(int player)
 	// Player 2 — blue, right half
 	DrawCharScaled(196, 68, '0' + score2, Font_16x26, 4, BLUE, BLACK);
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -242,6 +249,7 @@ int main(void)
   MX_LPUART1_UART_Init();
   MX_ADC1_Init();
   MX_SPI2_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
@@ -258,6 +266,14 @@ int main(void)
   };
   BNO055_Init(bno_init);
   ST7789_Init(); //if module disconnected, it wont get to the while.
+  ws2812_init(&htim2);
+
+  ws2812_set_pixel(0, 255, 0,   0);   // red
+  ws2812_set_pixel(1, 0,   255, 0);   // green
+  ws2812_set_pixel(2, 0,   0,   255); // blue
+
+  ws2812_show();
+
 
   /* USER CODE END 2 */
 
@@ -502,7 +518,6 @@ static void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 1 */
 
   /* USER CODE END SPI2_Init 1 */
-  /* SPI2 DataSize fixed to 8BIT (ST7789 requires 8-bit; CubeMX had generated 4BIT) */
   /* SPI2 parameter configuration*/
   hspi2.Instance = SPI2;
   hspi2.Init.Mode = SPI_MODE_MASTER;
@@ -525,6 +540,55 @@ static void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 2 */
 
   /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 19;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 
 }
 
@@ -605,6 +669,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+  /* DMA1_Channel2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
 
 }
 
