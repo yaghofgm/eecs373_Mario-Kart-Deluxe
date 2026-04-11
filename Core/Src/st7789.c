@@ -752,3 +752,30 @@ void ST7789_Test(void)
 	ST7789_DrawImage(0, 0, 128, 128, (uint16_t *)saber);
 	HAL_Delay(3000);
 }
+
+void DrawCharScaled(uint16_t x, uint16_t y, char ch, FontDef font, uint8_t scale, uint16_t color, uint16_t bgcolor)
+{
+	for (uint16_t i = 0; i < font.height; i++) {
+		uint16_t b = font.data[(ch - 32) * font.height + i];
+		for (uint16_t j = 0; j < font.width; j++) {
+			uint16_t c = ((b << j) & 0x8000) ? color : bgcolor;
+			ST7789_Fill(x + j * scale, y + i * scale, x + j * scale + scale - 1, y + i * scale + scale - 1, c);
+		}
+	}
+}
+void Scoreboard_Update(int player)
+{
+	static uint8_t score1 = 0;
+	static uint8_t score2 = 0;
+
+	if      (player == 0) { score1 = 0; score2 = 0; }
+	else if (player == 1) score1++;
+	else if (player == 2) score2++;
+
+	// Screen is now 320x240 (landscape). Font_16x26 at scale 4 = 64x104px per digit.
+	// Player 1 — red, left half  (x=60, y centered: (240-104)/2=68)
+	DrawCharScaled(60,  68, '0' + score1, Font_16x26, 4, RED,  BLACK);
+	// Player 2 — blue, right half
+	DrawCharScaled(196, 68, '0' + score2, Font_16x26, 4, BLUE, BLACK);
+}
+

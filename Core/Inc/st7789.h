@@ -293,6 +293,11 @@ void ST7789_TearEffect(uint8_t tear);
 /* Simple test function. */
 void ST7789_Test(void);
 
+/* Yagho Functions */
+void DrawCharScaled(uint16_t x, uint16_t y, char ch, FontDef font, uint8_t scale, uint16_t color, uint16_t bgcolor);
+void Scoreboard_Update(int player);
+
+
 #ifndef ST7789_ROTATION
     #error You should at least choose a display rotation!
 #endif
