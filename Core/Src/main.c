@@ -49,6 +49,7 @@
 ADC_HandleTypeDef hadc1;
 
 I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
 
 UART_HandleTypeDef hlpuart1;
 
@@ -73,6 +74,7 @@ static void MX_LPUART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_I2C2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -224,6 +226,7 @@ int main(void)
   MX_ADC1_Init();
   MX_SPI2_Init();
   MX_TIM2_Init();
+  MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
@@ -251,6 +254,17 @@ int main(void)
 //  ws2812_show();
 
 
+  HAL_Delay(1000);
+  PN532_Init(&hi2c2);
+  HAL_Delay(1000);
+
+  uint8_t uid[7] = {0};
+  uint8_t uidLen;
+  uint8_t boost_on = 0;
+  int boost_max_time = 1000;
+  int boost_start_time = 0;
+  int boost_current_time = 0;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -277,7 +291,29 @@ int main(void)
 //		  HAL_Delay(1000);
 //	  }
 //	  Scoreboard_Update(0);
+//	  doStar();
 	  doStar();
+
+	  if(PN532_ReadPassiveTargetID(uid, &uidLen) == HAL_OK){
+		  HAL_Delay(50);
+		  // Power-Up Trigger (UID: 0x4, 0xDE, 0xFA, 0x68, 0xBC, 0x2A, 0x81)
+		  if(*uid == 0x2009ffec){
+			  boost_on = 1;
+			  boost_start_time = 0; // TODO: replace with real timestamp
+		  }
+	  } else {
+		  for(int i = 0; i < 7; i++) uid[i] = 0;
+		  HAL_Delay(50);
+	  }
+
+	  if(boost_on){
+		  doStar();
+		  boost_current_time = 0; // TODO: replace with real timestamp
+		  if((boost_current_time - boost_start_time) >= boost_max_time){
+			  boost_on = 0;
+		  }
+	  }
+
   }
   /* USER CODE END 3 */
 }
@@ -429,6 +465,54 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
+
+  /* USER CODE BEGIN I2C2_Init 0 */
+
+  /* USER CODE END I2C2_Init 0 */
+
+  /* USER CODE BEGIN I2C2_Init 1 */
+
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.Timing = 0x00503D58;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C2_Init 2 */
+
+  /* USER CODE END I2C2_Init 2 */
 
 }
 
