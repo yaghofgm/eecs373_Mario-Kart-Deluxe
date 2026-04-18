@@ -225,6 +225,15 @@ void do_nfc_and_strip (){
 		}
 	}
 }
+void do_scoreboard (){
+	for (int i=0; i<9; i++){
+	  Scoreboard_Update(1);
+	  HAL_Delay(1000);
+	  Scoreboard_Update(2);
+	  HAL_Delay(1000);
+	}
+	Scoreboard_Update(0);
+}
 /* USER CODE END 0 */
 
 /**
@@ -278,7 +287,7 @@ int main(void)
       .ACC_Range   = Range_4G
   };
   BNO055_Init(bno_init);
-//  ST7789_Init(); //if module disconnected, it wont get to the while.
+  ST7789_Init(); //if module disconnected, it wont get to the while.
   ws2812_init(&htim4);
 
 //  ws2812_set_pixel(0,255,255,255);
@@ -316,15 +325,9 @@ int main(void)
 //	  test_adc_IMU();
 //	  drive_controller();
 //	  ST7789_Test();
-//	  for (int i=0; i<9; i++){
-//		  Scoreboard_Update(1);
-//		  HAL_Delay(1000);
-//		  Scoreboard_Update(2);
-//		  HAL_Delay(1000);
-//	  }
-//	  Scoreboard_Update(0);
+	  do_scoreboard();
 //	  doStar();
-	  do_nfc_and_strip();
+//	  do_nfc_and_strip();
 
   }
   /* USER CODE END 3 */
