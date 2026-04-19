@@ -201,11 +201,11 @@ void drive (int w_speed, int speed){
         //sending starman when we have an interrupt happen
         sprintf(tx_buffer, "{STARMAN}\r\n");
         HAL_UART_Transmit_IT(&huart3, (uint8_t*)tx_buffer, strlen(tx_buffer));
-
+        send_starman = 0;
     }
 
     // Minor fix: It is safer to use printf("%s", ...) rather than printf(buffer)
-    //printf("%s", tx_buffer);
+    printf("%s", tx_buffer);
     HAL_Delay(50);
 }
 void test_drive (void){
@@ -244,6 +244,10 @@ void drive_controller (){
 	int32_t speed = read_adc()*4;
 	int32_t w_speed = read_IMU()*4;
 	int sw = read_joystick_sw();
+
+	if (sw == 1) {
+		send_starman = 1;
+	}
 	drive(w_speed,speed);
 	//printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
 //	HAL_Delay(500);
@@ -968,15 +972,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 }
 
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if (huart->Instance == USART3)
-	{
-		if (send_starman == 1) {
-			send_starman = 0;
-		}
-	}
-}
+//void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+//{
+//	if (huart->Instance == USART3)
+//	{
+//		if (send_starman == 1) {
+//			send_starman = 0;
+//		}
+//	}
+//}
 
 /* USER CODE END 4 */
 
