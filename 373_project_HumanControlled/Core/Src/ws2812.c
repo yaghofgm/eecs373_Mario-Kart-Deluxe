@@ -29,7 +29,7 @@ void ws2812_show(void) {
     // Reset pulses at the end — CCR=0 means line stays low
     memset(&dma_buf[NUM_LEDS * 24], 0, RESET_PULSES * sizeof(uint32_t));
 
-    HAL_TIM_PWM_Start_DMA( //?????
+    HAL_TIM_PWM_Start_DMA(
         _htim,
         TIM_CHANNEL_3,
         (uint32_t*)dma_buf,

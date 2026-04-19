@@ -26,6 +26,11 @@
 #include "ws2812.h"
 #include "fonts.h"
 #include <stdio.h>
+#include "vroom.h"
+#include <PN532.h>
+#include "misc.h"
+#include "nfc_ids.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,18 +54,18 @@
 ADC_HandleTypeDef hadc1;
 
 I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
 
 UART_HandleTypeDef hlpuart1;
 
 SPI_HandleTypeDef hspi2;
 DMA_HandleTypeDef hdma_spi2_tx;
 
-TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
-DMA_HandleTypeDef hdma_tim2_ch3;
+DMA_HandleTypeDef hdma_tim4_ch3;
 
 /* USER CODE BEGIN PV */
-static float robot_width=0.1; //10cm
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,121 +77,19 @@ static void MX_I2C1_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI2_Init(void);
-static void MX_TIM2_Init(void);
+static void MX_I2C2_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-//DRV8833 has IN1 as forward and IN2 as backward.
-// IN1=PD15=CH4, IN2=PD14=CH3
-//speed is -100 to 100
-void motor_a_set (int speed){
-	speed = speed > 100 ? 100 : (speed < -100 ? -100 : speed);
-	if (speed > 0) {
-	   //IN1, IN2 = 1,0; PC0, PC1
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
-		//ENA = PWM , PF8 TIM5_CH3
-		TIM5->CCR3 = speed;
-	} else if (speed < 0) {
-		 //IN1, IN2 = 0,1; PC0, PC1
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
-		//ENB = PWM , PF9 TIM5_CH3
-		TIM5->CCR3 = -speed;
-	} else {
-		TIM5->CCR3 = 0;      // stop
-	}
-}
-void motor_b_set (int speed){
-	speed = speed > 100 ? 100 : (speed < -100 ? -100 : speed);
-	if (speed > 0) {
-	   //IN3, IN4 = 1,0; PC3, PC4
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-		//ENB = PWM , PF9 TIM5_CH4
-		TIM5->CCR4 = speed;
-	} else if (speed < 0) {
-		 //IN1, IN2 = 0,1; PC0, PC1
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
-		//ENB = PWM , PF9 TIM5_CH4
-		TIM5->CCR4 = -speed;
-	} else {
-		TIM5->CCR4 = 0;      // stop
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
-	}
-}
-void test_motor_set (){
-	motor_a_set(10);
-	HAL_Delay(2000);
-	motor_a_set(100);
-	HAL_Delay(4000);
-	motor_a_set(-50);
-	HAL_Delay(2000);
-	motor_a_set(-100);
-	HAL_Delay(2000);
-	motor_a_set(0);
-	HAL_Delay(8000);
-
-	motor_b_set(10);
-	HAL_Delay(2000);
-	motor_b_set(100);
-	HAL_Delay(4000);
-	motor_b_set(-50);
-	HAL_Delay(2000);
-	motor_b_set(-100);
-	HAL_Delay(2000);
-	motor_b_set(0);
-	HAL_Delay(2000);
-
-}
-//w is rad per sec, w=0 straight, w>0 is go to left, and w<0 is go to right
-//speed is -100 to 100.
-void drive (int w, int speed){
-	motor_a_set(speed-w*robot_width);
-	motor_b_set(speed+w*robot_width);
-}
-void test_drive (void){
-	drive(0, 20);
-	HAL_Delay(500);
-	drive(200, 0);
-	HAL_Delay(500);
-}
-int32_t read_IMU (){
-	static BNO055_Sensors_t sensors = {0};
-	static BNO055_Sensors_t sensors_old = {0};
-	ReadData(&sensors, SENSOR_EULER | SENSOR_LINACC);
-	if (sensors.Euler.Z > sensors_old.Euler.Z + 100) sensors.Euler.Z = sensors_old.Euler.Z;
-	sensors_old=sensors;
-	return (int32_t)sensors.Euler.Z;
-}
-void test_IMU (){
-	  printf("pitch: %ld deg\n", read_IMU());
-}
-// Returns -4 to 27 based on scaled down and offset Raw 12-bit ADC value (0–4095) from PB0 / ADC1_IN15
-int32_t read_adc(void) {
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-    return (int32_t)(2750-HAL_ADC_GetValue(&hadc1))/100;
-}
-void test_read_adc(void){
-	printf("joystick data: %ld\n", read_adc() );
-}
-void test_adc_IMU(void){
-	printf("pitch: %ld deg, joystick data: %ld\n", read_IMU(), read_adc());
-}
-void drive_controller (){
-	int32_t speed = read_adc()*4;
-	int32_t w_speed = read_IMU()*4;
-	drive(w_speed,speed);
-	printf("speed: %ld , ang_speed: %ld\n", speed, w_speed);
-//	HAL_Delay(500);
-}
+#define RX_BUFFER_SIZE 32          // <-- ADD THIS LINE
+uint8_t rx_byte;
+uint8_t rx_index = 0;
+char rx_buffer[RX_BUFFER_SIZE];    // <-- UPDATE THIS LINE
+volatile uint8_t data_ready = 0;
 /* USER CODE END 0 */
 
 /**
@@ -223,7 +126,8 @@ int main(void)
   MX_LPUART1_UART_Init();
   MX_ADC1_Init();
   MX_SPI2_Init();
-  MX_TIM2_Init();
+  MX_I2C2_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
@@ -239,8 +143,8 @@ int main(void)
       .ACC_Range   = Range_4G
   };
   BNO055_Init(bno_init);
-//  ST7789_Init(); //if module disconnected, it wont get to the while.
-  ws2812_init(&htim2);
+  ST7789_Init(); //if module disconnected, it wont get to the while.
+  ws2812_init(&htim4);
 
 //  ws2812_set_pixel(0,255,255,255);
 
@@ -250,6 +154,10 @@ int main(void)
 //
 //  ws2812_show();
 
+  //NFC Starts
+  HAL_Delay(1000);
+  PN532_Init(&hi2c2);
+  HAL_Delay(1000);
 
   /* USER CODE END 2 */
 
@@ -258,11 +166,125 @@ int main(void)
 //  BNO055_Sensors_t sensors_old = {0};
 //  BNO055_Sensors_t sensors = {0};
 //  int null_thresh= 0.
+
+  int speed = 0;
+  int w = 0;
+  float amplifier = 0.95;
+
+  // Trackers
+  uint8_t num_laps = 0;
+  // 1 = Green (Pre-Finish Line)
+  // 2 = Yellow (Finish Line)
+  // 3 = Blue (Power-Up)
+  // 0 = Other
+  uint8_t type_tag = 0;
+  // 0 = Wait
+  // 1 = Pre-Finish Line
+  // 2 = Finish Line
+  uint8_t lap_latch = 0;
+  // 1 = Start
+  // 0 = Stop
+  uint8_t start_timer = 1;
+  uint8_t power_up = 0;
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	  // TODO: FIX NFC AND STRIP NOW WORK
+
+	 // Read Target
+		if(PN532_ReadPassiveTargetID(uid, &uidLen) == HAL_OK){
+		  // Good Read -- TAG FOUND
+			HAL_Delay(50);
+
+			// TODO: Figure Out What Tag Was Read
+			type_tag = 0; // FUNC HERE
+
+			// Green (Pre-Finish Line)
+			if(type_tag == 1){
+			  lap_latch = 1;
+			}
+			// Yellow (Finish Line)
+			else if(type_tag == 2){
+			  lap_latch = 2;
+			}
+			// Blue (Power-Up)
+			else if(type_tag == 3){
+				power_up = 1;
+			}
+			// Error -- Print Tag
+			else{
+			  HAL_Delay(10);
+				printf("Unregistered Tag: UID = ");
+				for(int i = 0; i < 7; i++){
+				  printf("%02X",uid[i]);
+
+				  if(i < 6){
+					  printf(",");
+				  }
+				}
+				printf("\n");
+			}
+
+			// Start/End Timer if Applicable
+			if(lap_latch == 2){
+			  // Start Timer
+			  if(start_timer == 1){
+				  // TODO: Start Timer
+
+				  start_timer = 0;
+				  lap_latch = 0;
+			  }
+			  // Stop Timer
+			  else{
+				  // TODO: Stop Timer
+
+				  // TODO: Send Time to Controller
+
+				  start_timer = 1;
+				  lap_latch = 0;
+			  }
+			}
+
+		} // End Good Read
+		else{
+		  // Bad Read
+
+			// Reset ID
+			for(int i = 0; i < 7; i++){
+			  uid[i] = 0;
+			}
+
+			HAL_Delay(50);
+		} // End Bad Read
+
+	  motor_a_set(55); // 10 (keep fixed)
+	  motor_b_set(55); // 11
+	  if (data_ready) {
+		  // sscanf looks for the specific pattern "{number,number}"
+	      // It returns the number of variables successfully found.
+	      if (sscanf(rx_buffer, "{%d,%d}", &speed, &w) == 2) {
+	    	  // Successfully parsed both integers!
+	          printf("Success! Speed: %d, W: %d\r\n", speed, w);
+
+	          // You can now call drive(w, speed); here if you bring that function over
+	      } else {
+	    	  // The data got corrupted or didn't match the format
+	          printf("Parse Error. Received: %s\r\n", rx_buffer);
+	      }
+
+	      // Reset the flag to wait for the next message
+	      data_ready = 0;
+
+	    //            motor_a_set(speed - (int)(w * 0.1));
+	    //            motor_b_set(speed + (int)(w * 0.1));
+	  }
+
+
+
 //	  test_motor_set();
 //	  test_drive();
 //	  test_IMU();
@@ -270,14 +292,10 @@ int main(void)
 //	  test_adc_IMU();
 //	  drive_controller();
 //	  ST7789_Test();
-//	  for (int i=0; i<9; i++){
-//		  Scoreboard_Update(1);
-//		  HAL_Delay(1000);
-//		  Scoreboard_Update(2);
-//		  HAL_Delay(1000);
-//	  }
-//	  Scoreboard_Update(0);
-	  doStar();
+	  //do_scoreboard();
+//	  doStar();
+//	  do_nfc_and_strip();
+
   }
   /* USER CODE END 3 */
 }
@@ -433,6 +451,54 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
+
+  /* USER CODE BEGIN I2C2_Init 0 */
+
+  /* USER CODE END I2C2_Init 0 */
+
+  /* USER CODE BEGIN I2C2_Init 1 */
+
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.Timing = 0x00503D58;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C2_Init 2 */
+
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
   * @brief LPUART1 Initialization Function
   * @param None
   * @retval None
@@ -521,36 +587,36 @@ static void MX_SPI2_Init(void)
 }
 
 /**
-  * @brief TIM2 Initialization Function
+  * @brief TIM4 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM2_Init(void)
+static void MX_TIM4_Init(void)
 {
 
-  /* USER CODE BEGIN TIM2_Init 0 */
+  /* USER CODE BEGIN TIM4_Init 0 */
 
-  /* USER CODE END TIM2_Init 0 */
+  /* USER CODE END TIM4_Init 0 */
 
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM2_Init 1 */
+  /* USER CODE BEGIN TIM4_Init 1 */
 
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 19;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 0;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 19;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -558,14 +624,14 @@ static void MX_TIM2_Init(void)
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM2_Init 2 */
+  /* USER CODE BEGIN TIM4_Init 2 */
 
-  /* USER CODE END TIM2_Init 2 */
-  HAL_TIM_MspPostInit(&htim2);
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
 
 }
 
@@ -646,9 +712,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-  /* DMA1_Channel2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
 
 }
 
@@ -669,8 +735,8 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
-  HAL_PWREx_EnableVddIO2();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  HAL_PWREx_EnableVddIO2();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_4, GPIO_PIN_RESET);
@@ -708,6 +774,33 @@ PUTCHAR_PROTOTYPE
 {
   HAL_UART_Transmit(&hlpuart1, (uint8_t *)&ch, 1, 0xFFFF);
   return ch;
+}
+
+
+// This callback fires automatically when a UART byte is received via IT
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART3) {
+        // Ignore newline/carriage return characters from filling up the data buffer
+        if (rx_byte != '\n' && rx_byte != '\r') {
+            rx_buffer[rx_index++] = rx_byte;
+
+            // Prevent buffer overflow if garbage data is received
+            if (rx_index >= RX_BUFFER_SIZE - 1) {
+                rx_index = 0;
+            }
+        }
+
+        // If we received the closing bracket, the message is complete
+        if (rx_byte == '}') {
+            rx_buffer[rx_index] = '\0'; // Null-terminate the string so sscanf can read it safely
+            data_ready = 1;             // Tell the main loop to process it
+            rx_index = 0;               // Reset index for the next incoming message
+        }
+
+        // IMPORTANT: Re-arm the interrupt to listen for the next byte!
+        HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+    }
 }
 
 /* USER CODE END 4 */
