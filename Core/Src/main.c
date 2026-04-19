@@ -205,7 +205,7 @@ void drive (int w_speed, int speed){
     }
 
     // Minor fix: It is safer to use printf("%s", ...) rather than printf(buffer)
-    printf("%s", tx_buffer);
+    //printf("%s", tx_buffer);
     HAL_Delay(50);
 }
 void test_drive (void){
