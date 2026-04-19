@@ -30,6 +30,7 @@
 #include <PN532.h>
 #include "misc.h"
 #include "nfc_ids.h"
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -57,6 +58,7 @@ I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 
 UART_HandleTypeDef hlpuart1;
+UART_HandleTypeDef huart3;
 
 SPI_HandleTypeDef hspi2;
 DMA_HandleTypeDef hdma_spi2_tx;
@@ -79,8 +81,9 @@ static void MX_ADC1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+void USART3_SendString_IT(const char *str);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -128,6 +131,7 @@ int main(void)
   MX_SPI2_Init();
   MX_I2C2_Init();
   MX_TIM4_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
@@ -196,7 +200,7 @@ int main(void)
 	  // TODO: FIX NFC AND STRIP NOW WORK
 
 	 // Read Target
-		if(PN532_ReadPassiveTargetID(uid, &uidLen) == HAL_OK){
+		if(PN532_ReadPassiveTargetID(uid, &uidLen) == HAL_OK) {
 		  // Good Read -- TAG FOUND
 			HAL_Delay(50);
 
@@ -261,8 +265,8 @@ int main(void)
 			HAL_Delay(50);
 		} // End Bad Read
 
-	  motor_a_set(55); // 10 (keep fixed)
-	  motor_b_set(55); // 11
+	  //motor_a_set(55); // 10 (keep fixed)
+	  //motor_b_set(55); // 11
 	  if (data_ready) {
 		  // sscanf looks for the specific pattern "{number,number}"
 	      // It returns the number of variables successfully found.
@@ -279,8 +283,8 @@ int main(void)
 	      // Reset the flag to wait for the next message
 	      data_ready = 0;
 
-	    //            motor_a_set(speed - (int)(w * 0.1));
-	    //            motor_b_set(speed + (int)(w * 0.1));
+	      motor_a_set(speed - (int)(w * 0.1));
+          motor_b_set(speed + (int)(w * 0.1));
 	  }
 
 
@@ -547,6 +551,54 @@ static void MX_LPUART1_UART_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 9600;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * @brief SPI2 Initialization Function
   * @param None
   * @retval None
@@ -774,6 +826,17 @@ PUTCHAR_PROTOTYPE
 {
   HAL_UART_Transmit(&hlpuart1, (uint8_t *)&ch, 1, 0xFFFF);
   return ch;
+}
+
+void USART3_SendString_IT(const char *str)
+{
+    while (huart3.gState != HAL_UART_STATE_READY)
+    {
+        // wait for previous transmission to finish
+    }
+
+    // Initiate the transmission. The HAL will handle sending byte-by-byte in the background.
+    HAL_UART_Transmit_IT(&huart3, (const uint8_t *)str, strlen(str));
 }
 
 
