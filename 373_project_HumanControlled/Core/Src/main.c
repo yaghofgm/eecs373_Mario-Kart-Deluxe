@@ -844,24 +844,30 @@ void USART3_SendString_IT(const char *str)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == USART3) {
-        // Ignore newline/carriage return characters from filling up the data buffer
-        if (rx_byte != '\n' && rx_byte != '\r') {
+
+        // Define what character marks the end of your message.
+        if (rx_byte == '\n' || rx_byte == '}') {
+
+            // NEW: Only finalize the message if we actually captured data!
+            if (rx_index > 0) {
+                if (rx_byte == '}') {
+                    rx_buffer[rx_index++] = rx_byte;
+                }
+
+                rx_buffer[rx_index] = '\0';
+                rx_data_ready = 1;
+                rx_index = 0;
+            }
+
+        } else if (rx_byte != '\r') {
             rx_buffer[rx_index++] = rx_byte;
 
-            // Prevent buffer overflow if garbage data is received
             if (rx_index >= RX_BUFFER_SIZE - 1) {
                 rx_index = 0;
             }
         }
 
-        // If we received the closing bracket, the message is complete
-        if (rx_byte == '}') {
-            rx_buffer[rx_index] = '\0'; // Null-terminate the string so sscanf can read it safely
-            data_ready = 1;             // Tell the main loop to process it
-            rx_index = 0;               // Reset index for the next incoming message
-        }
-
-        // IMPORTANT: Re-arm the interrupt to listen for the next byte!
+        // Re-arm the interrupt
         HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
     }
 }
