@@ -26,6 +26,7 @@
 #include "ws2812.h"
 #include "fonts.h"
 #include <stdio.h>
+#include <string.h>
 
 // JC NFC Starts
 #include <PN532.h>
@@ -43,6 +44,8 @@
 #define led_ARR 19
 #define led_T1H 13
 #define led_T0H 6
+
+#define RX_BUFFER_SIZE 64          // Maximum length of an incoming message
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -57,6 +60,7 @@ I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 
 UART_HandleTypeDef hlpuart1;
+UART_HandleTypeDef huart3;
 
 SPI_HandleTypeDef hspi2;
 DMA_HandleTypeDef hdma_spi2_tx;
@@ -67,6 +71,12 @@ DMA_HandleTypeDef hdma_tim4_ch3;
 
 /* USER CODE BEGIN PV */
 static float robot_width=0.1; //10cm
+volatile int powerup_acquired = 1;
+int next_state_bl = 0;
+volatile uint32_t last_btn_press = 0;
+int send_starman = 0;
+
+static char tx_buffer[32];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -80,12 +90,36 @@ static void MX_ADC1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+uint8_t rx_byte;                   // Temporary storage for the single byte just received
+uint8_t rx_index = 0;              // Current position in the buffer
+char rx_buffer[RX_BUFFER_SIZE];    // Array to hold the full incoming string
+volatile uint8_t rx_data_ready = 0; // Flag to indicate a full message has arrived
+
+void HAL_GPIO_EXTI_Callback(uint16_t pin) {
+	if (pin == GPIO_PIN_13) {
+		uint32_t current_time = HAL_GetTick();
+
+		// 2. Only execute if 200 milliseconds have passed since the last press
+		if (current_time - last_btn_press > 200) {
+
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, next_state_bl);
+			powerup_acquired = 0;
+			next_state_bl = !next_state_bl;
+
+			// 3. Update the last press time
+			last_btn_press = current_time;
+
+			send_starman = 1;
+		}
+	}
+}
 
 //DRV8833 has IN1 as forward and IN2 as backward.
 // IN1=PD15=CH4, IN2=PD14=CH3
@@ -154,9 +188,25 @@ void test_motor_set (){
 }
 //w is rad per sec, w=0 straight, w>0 is go to left, and w<0 is go to right
 //speed is -100 to 100.
-void drive (int w, int speed){
-	motor_a_set(speed-w*robot_width);
-	motor_b_set(speed+w*robot_width);
+void drive (int w_speed, int speed){
+    // Change HAL_UART_GetState(&huart3) to huart3.gState
+	if (huart3.gState == HAL_UART_STATE_READY && send_starman == 0) {
+
+        sprintf(tx_buffer, "{%d,%d}\r\n", speed, -w_speed);
+        HAL_UART_Transmit_IT(&huart3, (uint8_t*)tx_buffer, strlen(tx_buffer));
+
+    }
+    else if (huart3.gState == HAL_UART_STATE_READY) {
+
+        //sending starman when we have an interrupt happen
+        sprintf(tx_buffer, "{STARMAN}\r\n");
+        HAL_UART_Transmit_IT(&huart3, (uint8_t*)tx_buffer, strlen(tx_buffer));
+
+    }
+
+    // Minor fix: It is safer to use printf("%s", ...) rather than printf(buffer)
+    //printf("%s", tx_buffer);
+    HAL_Delay(50);
 }
 void test_drive (void){
 	drive(0, 20);
@@ -195,7 +245,7 @@ void drive_controller (){
 	int32_t w_speed = read_IMU()*4;
 	int sw = read_joystick_sw();
 	drive(w_speed,speed);
-	printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
+	//printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
 //	HAL_Delay(500);
 }
 void do_nfc_and_strip (){
@@ -276,6 +326,7 @@ int main(void)
   MX_SPI2_Init();
   MX_I2C2_Init();
   MX_TIM4_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
@@ -310,6 +361,8 @@ int main(void)
 
   // JC NFC Ends
 
+  HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -327,6 +380,22 @@ int main(void)
 //	  test_IMU();
 //	  test_read_adc();
 //	  test_adc_IMU();
+
+	if (rx_data_ready == 1) {
+		char extracted_message[RX_BUFFER_SIZE];
+
+		// Parse the data between the brackets
+		// %31[^}] means "read up to 31 characters, stopping when you hit a '}'"
+		if (sscanf(rx_buffer, "{%31[^}]}", extracted_message) == 1) {
+			printf("Valid message received: %s\r\n", extracted_message);
+		} else {
+			printf("Invalid format received: %s\r\n", rx_buffer);
+		}
+
+		// Reset the flag to listen for the next message
+		rx_data_ready = 0;
+	}
+
 	  drive_controller();
 //	  ST7789_Test();
 //	  do_scoreboard();
@@ -584,6 +653,54 @@ static void MX_LPUART1_UART_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 9600;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * @brief SPI2 Initialization Function
   * @param None
   * @retval None
@@ -819,6 +936,48 @@ PUTCHAR_PROTOTYPE
   return ch;
 }
 
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART3) {
+
+        // Define what character marks the end of your message.
+        if (rx_byte == '\n' || rx_byte == '}') {
+
+            // NEW: Only finalize the message if we actually captured data!
+            if (rx_index > 0) {
+                if (rx_byte == '}') {
+                    rx_buffer[rx_index++] = rx_byte;
+                }
+
+                rx_buffer[rx_index] = '\0';
+                rx_data_ready = 1;
+                rx_index = 0;
+            }
+
+        } else if (rx_byte != '\r') {
+            rx_buffer[rx_index++] = rx_byte;
+
+            if (rx_index >= RX_BUFFER_SIZE - 1) {
+                rx_index = 0;
+            }
+        }
+
+        // Re-arm the interrupt
+        HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+    }
+}
+
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART3)
+	{
+		if (send_starman == 1) {
+			send_starman = 0;
+		}
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
@@ -828,7 +987,7 @@ PUTCHAR_PROTOTYPE
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+  /* User can add his own implementation to report the HAL_GPIO_EXTI_Callback error return state */
   __disable_irq();
   while (1)
   {
