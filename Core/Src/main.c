@@ -187,11 +187,15 @@ void test_read_adc(void){
 void test_adc_IMU(void){
 	printf("pitch: %ld deg, joystick data: %ld\n", read_IMU(), read_adc());
 }
+int read_joystick_sw(void){
+	return HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET; // 1 when pressed, 0 when not
+}
 void drive_controller (){
 	int32_t speed = read_adc()*4;
 	int32_t w_speed = read_IMU()*4;
+	int sw = read_joystick_sw();
 	drive(w_speed,speed);
-	printf("speed: %ld , ang_speed: %ld\n", speed, w_speed);
+	printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
 //	HAL_Delay(500);
 }
 void do_nfc_and_strip (){
@@ -323,9 +327,9 @@ int main(void)
 //	  test_IMU();
 //	  test_read_adc();
 //	  test_adc_IMU();
-//	  drive_controller();
+	  drive_controller();
 //	  ST7789_Test();
-	  do_scoreboard();
+//	  do_scoreboard();
 //	  doStar();
 //	  do_nfc_and_strip();
 
@@ -783,6 +787,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PG1 PG3 PG5 */
   GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5;
