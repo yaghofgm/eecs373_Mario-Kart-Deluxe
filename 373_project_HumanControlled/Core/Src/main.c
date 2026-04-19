@@ -190,6 +190,21 @@ int main(void)
   // 0 = Stop
   uint8_t start_timer = 1;
   uint8_t power_up = 0;
+	// Initialize UID
+	uint8_t uid[7] = {0};
+	uint8_t uidLen = 0;
+	// Power-Up Timer Stuff
+	uint8_t boost_on = 0;
+	int boost_max_time = 10000;
+	int boost_start_time = 0;
+	int boost_current_time = 0;
+	// Lap Time Stuff
+	int lap_start_time = 0;
+	int lap_end_time = 0;
+	// Power-Up Stuff
+	extern const uint8_t green [][7]; // (PFL; 1)
+	extern const uint8_t yellow [][7]; // (FL; 2)
+	extern const uint8_t purple [][7]; // (Power Up; 3)
 
   while (1)
   {
@@ -205,7 +220,7 @@ int main(void)
 			HAL_Delay(50);
 
 			// TODO: Figure Out What Tag Was Read
-			type_tag = 0; // FUNC HERE
+			type_tag = identify_tag_color(uid,green,yellow,purple); 
 
 			// Green (Pre-Finish Line)
 			if(type_tag == 1){
@@ -237,17 +252,23 @@ int main(void)
 			if(lap_latch == 2){
 			  // Start Timer
 			  if(start_timer == 1){
-				  // TODO: Start Timer
+				  // Start Lap Time
+				  lap_start_time = HAL_GetTick();
 
+				  // Change Latches
 				  start_timer = 0;
 				  lap_latch = 0;
 			  }
 			  // Stop Timer
 			  else{
-				  // TODO: Stop Timer
+				  // Stop Timer
+				  lap_end_time = HAL_GetTick();
+				  int lap_time = (lap_end_time - lap_start_time); // TODO: Likely need to adjust time
 
-				  // TODO: Send Time to Controller
-
+				  // Send Time to Controller
+				  USART3_SendString_IT(std::to_string(lap_time));
+					  
+				  // Change Latches
 				  start_timer = 1;
 				  lap_latch = 0;
 			  }
