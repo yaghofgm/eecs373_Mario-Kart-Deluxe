@@ -371,12 +371,12 @@ int main(void)
 	      data_ready = 0;
 
 	      if(boost_on){
-	    	  motor_a_set(0.65 * (speed - (int)(w * 0.1)));
-	    	  motor_b_set(0.65 * (speed + (int)(w * 0.1)));
+	    	  motor_a_set(0.65 * (speed + (int)(w * 0.1)));
+	    	  motor_b_set(0.65 * (speed - (int)(w * 0.1)));
 	      }
 	      else{
-	    	  motor_a_set(0.5 * (speed - (int)(w * 0.1)));
-	    	  motor_b_set(0.5 * (speed + (int)(w * 0.1)));
+	    	  motor_a_set(0.5 * (speed + (int)(w * 0.1)));
+	    	  motor_b_set(0.5 * (speed - (int)(w * 0.1)));
 	      }
 	      //motor_a_set(0.5 * (speed - (int)(w * 0.1)));
           //motor_b_set(0.5 * (speed + (int)(w * 0.1)));
@@ -400,16 +400,17 @@ int main(void)
 
 	  if(reset_color){
 		  if( (HAL_GetTick() - reset_start_time) > 2000 ){
-			  if(power_up){
-				  // Set Yellow
-				  for(int i = 0; i < 15; i++){
-				  	ws2812_set_pixel(i,255,255,0);
-				  }
-				  ws2812_show();
-			  }
-			  else if(boost_on){
+			  if(boost_on){
 				  // Set Rainbow
 				  doStar();
+
+			  }
+			  else if(power_up){
+				  // Set Yellow
+				  for(int i = 0; i < 15; i++){
+					  ws2812_set_pixel(i,255,255,0);
+				  }
+				  ws2812_show();
 			  }
 			  else{
 				  // Set White

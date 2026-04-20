@@ -7,14 +7,14 @@ void motor_a_set (int speed){
 	speed = speed > 100 ? 100 : (speed < -100 ? -100 : speed);
 	if (speed > 0) {
 	   //IN1, IN2 = 1,0; PC0, PC1
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
 		//ENA = PWM , PF8 TIM5_CH3
 		TIM5->CCR3 = speed;
 	} else if (speed < 0) {
 		 //IN1, IN2 = 0,1; PC0, PC1
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
 		//ENB = PWM , PF9 TIM5_CH3
 		TIM5->CCR3 = -speed;
 	} else {
