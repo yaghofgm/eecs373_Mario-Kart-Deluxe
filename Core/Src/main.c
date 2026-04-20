@@ -76,6 +76,17 @@ int next_state_bl = 0;
 volatile uint32_t last_btn_press = 0;
 int send_starman = 0;
 
+volatile uint32_t lap_start_time = 0;
+volatile uint32_t last_lap_time = 0;
+volatile uint32_t current_lap_time = 0;
+volatile uint8_t  is_racing = 0; // 0 = stopped, 1 = running
+
+volatile uint32_t car1_last_time = 0;
+volatile uint32_t car1_best_time = 0xFFFFFFFF; // 0xFFFFFFFF acts as our "empty" state
+
+volatile uint32_t car2_last_time = 0;
+volatile uint32_t car2_best_time = 0xFFFFFFFF;
+
 static char tx_buffer[32];
 /* USER CODE END PV */
 
@@ -102,6 +113,46 @@ uint8_t rx_index = 0;              // Current position in the buffer
 char rx_buffer[RX_BUFFER_SIZE];    // Array to hold the full incoming string
 volatile uint8_t rx_data_ready = 0; // Flag to indicate a full message has arrived
 
+void record_lap(int car_number, uint32_t lap_time_ms) {
+    if (car_number == 1) { // let 1 be the wall-e
+        car1_last_time = lap_time_ms;
+        if (lap_time_ms < car1_best_time) {
+            car1_best_time = lap_time_ms;
+        }
+    }
+    else if (car_number == 2) { // regular car
+        car2_last_time = lap_time_ms;
+        if (lap_time_ms < car2_best_time) {
+            car2_best_time = lap_time_ms;
+        }
+    }
+}
+
+void print_time_line(uint16_t y, const char* label, uint32_t time_ms, uint16_t color) {
+    char buf[32];
+
+    // If no lap has been recorded yet, show dashes
+    if (time_ms == 0xFFFFFFFF || time_ms == 0) {
+        sprintf(buf, "%s: --.-- s", label);
+    } else {
+        uint32_t sec = time_ms / 1000;
+        uint32_t hun = (time_ms % 1000) / 10;
+        sprintf(buf, "%s: %3lu.%02lu s", label, sec, hun);
+    }
+
+    ST7789_WriteString(10, y, buf, Font_11x18, color, BLACK);
+}
+
+void update_lcd_display(void) {
+    // --- Car 1 ---
+    print_time_line(20, "C1 Best Time", car1_best_time, YELLOW);
+    print_time_line(45, "C1 Last Time", car1_last_time, RED);
+
+    // --- Car 2 ---
+    print_time_line(90, "C2 Best Time", car2_best_time, CYAN);
+    print_time_line(115,"C2 Last Time", car2_last_time, BLUE);
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t pin) {
 	if (pin == GPIO_PIN_13) {
 		uint32_t current_time = HAL_GetTick();
@@ -119,6 +170,26 @@ void HAL_GPIO_EXTI_Callback(uint16_t pin) {
 			send_starman = 1;
 		}
 	}
+}
+
+void trigger_lap(void) {
+    if (is_racing == 0) {
+        // Start the race for the very first time
+        lap_start_time = HAL_GetTick();
+        is_racing = 1;
+    } else {
+        // We are already racing, so save the current time as our "Last Lap"
+        last_lap_time = HAL_GetTick() - lap_start_time;
+        // Reset the start time for the next lap
+        lap_start_time = HAL_GetTick();
+    }
+}
+
+// Call this constantly in your main loop to update the clock
+void update_stopwatch(void) {
+    if (is_racing == 1) {
+        current_lap_time = HAL_GetTick() - lap_start_time;
+    }
 }
 
 //DRV8833 has IN1 as forward and IN2 as backward.
@@ -205,7 +276,7 @@ void drive (int w_speed, int speed){
     }
 
     // Minor fix: It is safer to use printf("%s", ...) rather than printf(buffer)
-    //printf("%s", tx_buffer);
+    printf("%s", tx_buffer);
     HAL_Delay(50);
 }
 void test_drive (void){
@@ -220,7 +291,7 @@ int32_t read_IMU (){
 	ReadData(&sensors, SENSOR_EULER | SENSOR_LINACC);
 	if (sensors.Euler.Z > sensors_old.Euler.Z + 100) sensors.Euler.Z = sensors_old.Euler.Z;
 	sensors_old=sensors;
-	return (int32_t)sensors.Euler.Z;
+	return (int32_t)sensors.Euler.Z; // 60 is offset needed for controller
 }
 void test_IMU (){
 	  printf("pitch: %ld deg\n", read_IMU());
@@ -242,14 +313,23 @@ int read_joystick_sw(void){
 }
 void drive_controller (){
 	int32_t speed = read_adc()*4;
-	int32_t w_speed = read_IMU()*4;
+	if (speed == 4) {
+		speed = 0;
+	}
+	int32_t w_speed = read_IMU()*4 + 60;
 	int sw = read_joystick_sw();
 
 	if (sw == 1) {
 		send_starman = 1;
+		uint32_t final_lap_time = HAL_GetTick() - lap_start_time;
+		record_lap(1, final_lap_time);
+		lap_start_time = HAL_GetTick();
+
+		update_lcd_display();
 	}
 	drive(w_speed,speed);
-	//printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
+
+	printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
 //	HAL_Delay(500);
 }
 void do_nfc_and_strip (){
@@ -286,9 +366,9 @@ void do_nfc_and_strip (){
 void do_scoreboard (){
 	for (int i=0; i<9; i++){
 	  Scoreboard_Update(1);
-	  HAL_Delay(1000);
+	  //HAL_Delay(1000);
 	  Scoreboard_Update(2);
-	  HAL_Delay(1000);
+	  //HAL_Delay(1000);
 	}
 	Scoreboard_Update(0);
 }
@@ -347,6 +427,8 @@ int main(void)
   };
   BNO055_Init(bno_init);
   ST7789_Init(); //if module disconnected, it wont get to the while.
+  ST7789_Fill_Color(BLACK);
+  update_lcd_display();
   ws2812_init(&htim4);
 
 //  ws2812_set_pixel(0,255,255,255);
@@ -402,6 +484,7 @@ int main(void)
 
 	  drive_controller();
 //	  ST7789_Test();
+//	  update_lcd_display();
 //	  do_scoreboard();
 //	  doStar();
 //	  do_nfc_and_strip();
