@@ -220,7 +220,7 @@ int main(void)
 			HAL_Delay(50);
 
 			// TODO: Figure Out What Tag Was Read
-			type_tag = identify_tag_color(uid,green,yellow,purple); 
+			type_tag = identify_tag_color(uid,green,36,yellow,36,purple,36);
 
 			// Green (Pre-Finish Line)
 			if(type_tag == 1){
@@ -266,7 +266,9 @@ int main(void)
 				  int lap_time = (lap_end_time - lap_start_time); // TODO: Likely need to adjust time
 
 				  // Send Time to Controller
-				  USART3_SendString_IT(std::to_string(lap_time));
+				  char lap_time_buffer[20];
+				  sprintf(lap_time_buffer,"%d",lap_time);
+				  USART3_SendString_IT(lap_time_buffer);
 					  
 				  // Change Latches
 				  start_timer = 1;
@@ -876,7 +878,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
                 }
 
                 rx_buffer[rx_index] = '\0';
-                rx_data_ready = 1;
+                data_ready = 1;
                 rx_index = 0;
             }
 
