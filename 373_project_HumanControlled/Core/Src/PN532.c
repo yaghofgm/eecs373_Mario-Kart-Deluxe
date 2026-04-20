@@ -6,6 +6,8 @@ static HAL_StatusTypeDef PN532_WriteCommand(uint8_t *cmd, uint8_t cmdlen);
 static HAL_StatusTypeDef PN532_ReadAck(void);
 static HAL_StatusTypeDef PN532_ReadResponse(uint8_t *buf, uint8_t *outLen);
 
+int timeout_time = 50;
+
 // Make sure device is ready
 HAL_StatusTypeDef PN532_Init(I2C_HandleTypeDef *hi2c){
 	pn532_i2c = hi2c;
@@ -72,7 +74,7 @@ HAL_StatusTypeDef PN532_ReadPassiveTargetID(uint8_t *uid, uint8_t *uidLength){
 	}
 
 	// Wait Ready (Swapped from 3k)
-	if (PN532_WaitReady(200) != HAL_OK){
+	if (PN532_WaitReady(timeout_time) != HAL_OK){
 		return HAL_ERROR;
 	}
 
@@ -184,7 +186,7 @@ static HAL_StatusTypeDef PN532_WriteCommand(uint8_t *cmd, uint8_t cmdlen){
 	frame[7 + cmdlen] = PN532_Postamble;
 
 	// Send
-	return HAL_I2C_Master_Transmit(pn532_i2c,PN532_Addr,frame,8 + cmdlen,1000);
+	return HAL_I2C_Master_Transmit(pn532_i2c,PN532_Addr,frame,8 + cmdlen,timeout_time);
 }
 
 // Read Acknowledge
@@ -194,12 +196,12 @@ static HAL_StatusTypeDef PN532_ReadAck(void){
 	uint8_t tmp[7];
 
 	// Wait for Ready
-	if (PN532_WaitReady(1000) != HAL_OK){
+	if (PN532_WaitReady(timeout_time) != HAL_OK){
 		return HAL_TIMEOUT;
 	}
 
 	// Read
-	if (HAL_I2C_Master_Receive(pn532_i2c, PN532_Addr, tmp, 7, 1000) != HAL_OK){
+	if (HAL_I2C_Master_Receive(pn532_i2c, PN532_Addr, tmp, 7, timeout_time) != HAL_OK){
 		return HAL_ERROR;
 	}
 
@@ -226,12 +228,12 @@ static HAL_StatusTypeDef PN532_ReadResponse(uint8_t *buf, uint8_t *outLen){
 	uint8_t tmp[64];
 
 	// 1. Wait until PN532 is ready
-	if (PN532_WaitReady(1000) != HAL_OK){
+	if (PN532_WaitReady(timeout_time) != HAL_OK){
 		return HAL_TIMEOUT;
 	}
 
 	// 2. Read full I2C frame (includes leading status byte)
-	if (HAL_I2C_Master_Receive(pn532_i2c, PN532_Addr, tmp, sizeof(tmp), 1000) != HAL_OK){
+	if (HAL_I2C_Master_Receive(pn532_i2c, PN532_Addr, tmp, sizeof(tmp), timeout_time) != HAL_OK){
 		return HAL_ERROR;
 	}
 

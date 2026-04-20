@@ -208,6 +208,12 @@ int main(void)
 	extern const uint8_t yellow [][7]; // (FL; 2)
 	extern const uint8_t purple [][7]; // (Power Up; 3)
 
+	// Set LED to White
+	for(int i = 0; i < 15; i++){
+		ws2812_set_pixel(i,255,255,255);
+	}
+	ws2812_show();
+
   while (1)
   {
     /* USER CODE END WHILE */
@@ -216,104 +222,157 @@ int main(void)
 
 	  // TODO: FIX NFC AND STRIP NOW WORK
 
+
 	 // Read Target
-//		if(PN532_ReadPassiveTargetID(uid, &uidLen) == HAL_OK) {
-//		  // Good Read -- TAG FOUND
-//			HAL_Delay(50);
-//
-//			// TODO: Figure Out What Tag Was Read
-//			type_tag = identify_tag_color(uid,green,36,yellow,36,purple,36);
-//
-//			// Green (Pre-Finish Line)
-//			if(type_tag == 1){
-//			  lap_latch = 1;
-//			}
-//			// Yellow (Finish Line)
-//			else if(type_tag == 2){
-//			  lap_latch = 2;
-//			}
-//			// Blue (Power-Up)
-//			else if(type_tag == 3){
-//				power_up = 1;
-//				doStar();
-//				HAL_Delay(50); // TESTING TODO
-//			}
-//			// Error -- Print Tag
-//			else{
-//			  HAL_Delay(10);
-//				printf("Unregistered Tag: UID = ");
-//				for(int i = 0; i < 7; i++){
-//				  printf("%02X",uid[i]);
-//
-//				  if(i < 6){
-//					  printf(",");
-//				  }
-//				}
-//				printf("\n");
-//			}
-//
-//			// Start/End Timer if Applicable
-//			if(lap_latch == 2){
-//			  // Start Timer
-//			  if(start_timer == 1){
-//				  // Start Lap Time
-//				  lap_start_time = HAL_GetTick();
-//
-//				  // Change Latches
-//				  start_timer = 0;
-//				  lap_latch = 0;
-//			  }
-//			  // Stop Timer
-//			  else{
-//				  // Stop Timer
-//				  lap_end_time = HAL_GetTick();
-//				  int lap_time = (lap_end_time - lap_start_time); // TODO: Likely need to adjust time
-//
-//				  // Send Time to Controller
-//				  char lap_time_buffer[20];
-//				  sprintf(lap_time_buffer,"%d",lap_time);
-//				  USART3_SendString_IT(lap_time_buffer);
-//
-//				  // Change Latches
-//				  start_timer = 1;
-//				  lap_latch = 0;
-//			  }
-//			}
-//
-//		} // End Good Read
-//		else{
-//		  // Bad Read
-//
-//			// Reset ID
-//			for(int i = 0; i < 7; i++){
-//			  uid[i] = 0;
-//			}
-//
-//			HAL_Delay(50);
-//		} // End Bad Read
+		if(PN532_ReadPassiveTargetID(uid, &uidLen) == HAL_OK) {
+		  // Good Read -- TAG FOUND
+			//HAL_Delay(50);
+
+			// TODO: Figure Out What Tag Was Read
+			type_tag = identify_tag_color(uid,green,36,yellow,36,purple,36);
+
+			// Green (Pre-Finish Line)
+			if(type_tag == 1){
+			  if(lap_latch == 0){
+				  lap_latch = 1;
+			  }
+			}
+			// Yellow (Finish Line)
+			else if(type_tag == 2){
+			  if(lap_latch == 1){
+				  lap_latch = 2;
+			  }
+			}
+			// Blue (Power-Up)
+			else if(type_tag == 3){
+				power_up = 1;
+
+				// Set Yellow
+				for(int i = 0; i < 15; i++){
+					ws2812_set_pixel(i,255,255,0);
+				}
+				ws2812_show();
+
+
+				//doStar();
+				//HAL_Delay(50); // TESTING TODO
+			}
+			// Error -- Print Tag
+			else{
+			  HAL_Delay(10);
+				printf("Unregistered Tag: UID = ");
+				for(int i = 0; i < 7; i++){
+				  printf("%02X",uid[i]);
+
+				  if(i < 6){
+					  printf(",");
+				  }
+				}
+				printf("\n");
+			}
+
+
+
+			// Start/End Timer if Applicable
+			if(lap_latch == 2){
+			  // Start Timer
+			  if(start_timer == 1){
+				  // Start Lap Time
+				  lap_start_time = HAL_GetTick();
+
+				  // Change Latches
+				  start_timer = 0;
+				  lap_latch = 0;
+			  }
+			  // Stop Timer
+			  else{
+				  // Stop Timer
+				  lap_end_time = HAL_GetTick();
+				  int lap_time = (lap_end_time - lap_start_time); // TODO: Likely need to adjust time
+
+				  // Send Time to Controller
+				  char lap_time_buffer[20];
+				  sprintf(lap_time_buffer,"%d",lap_time);
+				  USART3_SendString_IT(lap_time_buffer);
+
+				  // Change Latches
+				  start_timer = 1;
+				  lap_latch = 0;
+			  }
+			}
+
+
+		} // End Good Read
+		else{
+		  // Bad Read
+
+			// Reset ID
+			for(int i = 0; i < 7; i++){
+			  uid[i] = 0;
+			}
+
+			//HAL_Delay(50);
+		} // End Bad Read
+
 
 	  //motor_a_set(55); // 10 (keep fixed)
 	  //motor_b_set(55); // 11
-//	  if (data_ready) {
-//		  // sscanf looks for the specific pattern "{number,number}"
-//	      // It returns the number of variables successfully found.
-//	      if (sscanf(rx_buffer, "{%d,%d}", &speed, &w) == 2) {
-//	    	  // Successfully parsed both integers!
-//	          printf("Success! Speed: %d, W: %d\r\n", speed, w);
-//
-//	          // You can now call drive(w, speed); here if you bring that function over
-//	      } else {
-//	    	  // The data got corrupted or didn't match the format
-//	          printf("Parse Error. Received: %s\r\n", rx_buffer);
-//	      }
-//
-//	      // Reset the flag to wait for the next message
-//	      data_ready = 0;
-//
-//	      motor_a_set(speed - (int)(w * 0.1));
-//          motor_b_set(speed + (int)(w * 0.1));
-//	  }
+//	 sscanf(rx_buffer, "{%d,%d}", &speed, &w);
+//	 printf("Success! Speed: %d, W: %d\r\n", speed, w);
+	  if (data_ready) {
+		  // sscanf looks for the specific pattern "{number,number}"
+	      // It returns the number of variables successfully found.
+	      if (sscanf(rx_buffer, "{%d,%d}", &speed, &w) == 2) {
+	    	  // Successfully parsed both integers!
+	          printf("Success! Speed: %d, W: %d\r\n", speed, w);
 
+	          // You can now call drive(w, speed); here if you bring that function over
+	      } else if (strcmp(rx_buffer, "{STARMAN}") == 0) {
+	          printf("STARMAN Received: %s\r\n", rx_buffer);
+	          if(power_up){
+	        	  boost_start_time = HAL_GetTick();
+	        	  boost_current_time = HAL_GetTick();
+	        	  boost_on = 1;
+
+	        	  power_up = 0;
+
+	        	  doStar();
+	          }
+	      } else {
+	    	  // The data got corrupted or didn't match the format
+	    	  printf("Parse error: Received: %s\r\n", rx_buffer);
+	      }
+
+	      // Reset the flag to wait for the next message
+	      data_ready = 0;
+
+	      if(boost_on){
+	    	  motor_a_set(0.65 * (speed - (int)(w * 0.1)));
+	    	  motor_b_set(0.65 * (speed + (int)(w * 0.1)));
+	      }
+	      else{
+	    	  motor_a_set(0.5 * (speed - (int)(w * 0.1)));
+	    	  motor_b_set(0.5 * (speed + (int)(w * 0.1)));
+	      }
+	      //motor_a_set(0.5 * (speed - (int)(w * 0.1)));
+          //motor_b_set(0.5 * (speed + (int)(w * 0.1)));
+	  }
+
+	  if(boost_on){
+		  if( (HAL_GetTick() - boost_start_time) < boost_max_time ){
+			  //doStar();
+			  //boost_current_time = HAL_GetTick();
+		  }
+		  else{
+			  boost_on = 0;
+
+			  // Set LED to White
+			  for(int i = 0; i < 15; i++){
+			  	ws2812_set_pixel(i,255,255,255);
+			  }
+			  ws2812_show();
+		  }
+	  }
 
 
 //	  test_motor_set();
@@ -324,7 +383,7 @@ int main(void)
 //	  drive_controller();
 //	  ST7789_Test();
 	  //do_scoreboard();
-	  doStar();
+//	  doStar();
 //	  do_nfc_and_strip();
 
   }
@@ -895,6 +954,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         }
 
         // Re-arm the interrupt
+        HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+    }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART3) {
         HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
     }
 }
