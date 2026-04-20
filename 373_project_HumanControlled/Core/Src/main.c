@@ -348,7 +348,7 @@ int main(void)
 	      // It returns the number of variables successfully found.
 	      if (sscanf(rx_buffer, "{%d,%d}", &speed, &w) == 2) {
 	    	  // Successfully parsed both integers!
-	          //printf("Success! Speed: %d, W: %d\r\n", speed, w);
+	          printf("Success! Speed: %d, W: %d\r\n", speed, w);
 
 	          // You can now call drive(w, speed); here if you bring that function over
 	      } else if (strcmp(rx_buffer, "{STARMAN}") == 0) {
@@ -371,12 +371,12 @@ int main(void)
 	      data_ready = 0;
 
 	      if(boost_on){
-	    	  motor_a_set(0.65 * (speed + (int)(w * 0.1)));
-	    	  motor_b_set(0.65 * (speed - (int)(w * 0.1)));
+	    	  motor_a_set(0.35 * (speed + (int)(w * 0.1)));
+	    	  motor_b_set(0.35 * (speed - (int)(w * 0.1)));
 	      }
 	      else{
-	    	  motor_a_set(0.5 * (speed + (int)(w * 0.1)));
-	    	  motor_b_set(0.5 * (speed - (int)(w * 0.1)));
+	    	  motor_a_set(0.25 * (speed + (int)(w * 0.1)));
+	    	  motor_b_set(0.25 * (speed - (int)(w * 0.1)));
 	      }
 	      //motor_a_set(0.5 * (speed - (int)(w * 0.1)));
           //motor_b_set(0.5 * (speed + (int)(w * 0.1)));
