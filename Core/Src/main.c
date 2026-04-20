@@ -276,7 +276,7 @@ void drive (int w_speed, int speed){
     }
 
     // Minor fix: It is safer to use printf("%s", ...) rather than printf(buffer)
-    printf("%s", tx_buffer);
+    //printf("%s", tx_buffer);
     HAL_Delay(50);
 }
 void test_drive (void){
@@ -479,25 +479,25 @@ int main(void)
 			printf("Valid message received: %s\r\n", extracted_message);
 
 			// Check if the message is the "jetson" trigger for Car 1
-			if (strcmp(extracted_message, "jetson") == 0) {
-				if (is_racing == 0) {
-					// Start the internal timer for Car 1
-					lap_start_time = HAL_GetTick();
-					is_racing = 1;
-					printf("Car 1 Race Started!\r\n");
-				} else {
-					// Calculate Car 1 lap time based on internal ticks
-					uint32_t current_time = HAL_GetTick();
-					uint32_t lap_time = current_time - lap_start_time;
+			if (strstr(extracted_message, "jetson") != NULL) {
+			    if (is_racing == 0) {
+			        // Start the internal timer for Car 1
+			        lap_start_time = HAL_GetTick();
+			        is_racing = 1;
+			        printf("Car 1 Race Started!\r\n");
+			    } else {
+			        // Calculate Car 1 lap time based on internal ticks
+			        uint32_t current_time = HAL_GetTick();
+			        uint32_t lap_time = current_time - lap_start_time;
 
-					// Reset the start time for the next lap
-					lap_start_time = current_time;
+			        // Reset the start time for the next lap
+			        lap_start_time = current_time;
 
-					// Record and update screen
-					record_lap(1, lap_time);
-					update_lcd_display();
-					printf("Car 1 Lap Recorded: %lu ms\r\n", lap_time);
-				}
+			        // Record and update screen
+			        record_lap(1, lap_time);
+			        update_lcd_display();
+			        printf("Car 1 Lap Recorded: %lu ms\r\n", lap_time);
+			    }
 			}
 			// If not "jetson", check if it is a numeric lap time for Car 2
 			else if (sscanf(extracted_message, "%lu", &received_time) == 1) {
