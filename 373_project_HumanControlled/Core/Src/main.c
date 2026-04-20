@@ -233,6 +233,8 @@ int main(void)
 			// Blue (Power-Up)
 			else if(type_tag == 3){
 				power_up = 1;
+				do_star();
+				HAL_Delay(50); // TESTING TODO
 			}
 			// Error -- Print Tag
 			else{
