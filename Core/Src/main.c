@@ -317,20 +317,22 @@ void drive_controller (){
 		speed = 0;
 	}
 	int32_t w_speed = read_IMU()*4 + 60;
+
 	int sw = read_joystick_sw();
+	static int last_sw_state = 0; // Remembers the switch state between loops
 
-	if (sw == 1) {
+	// Only flag to send STARMAN if the switch is pressed NOW, but wasn't pressed LAST LOOP
+	if (sw == 1 && last_sw_state == 0) {
 		send_starman = 1;
-		uint32_t final_lap_time = HAL_GetTick() - lap_start_time;
-		record_lap(1, final_lap_time);
-		lap_start_time = HAL_GetTick();
-
-		update_lcd_display();
+		printf("STARMAN triggered via Joystick!\r\n");
 	}
+
+	// Update the switch state for the next time the loop runs
+	last_sw_state = sw;
+
 	drive(w_speed,speed);
 
-	printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
-//	HAL_Delay(500);
+	//printf("speed: %ld , ang_speed: %ld, sw: %d\n", speed, w_speed, sw);
 }
 void do_nfc_and_strip (){
 	static uint8_t uid[7] = {0};
@@ -469,11 +471,46 @@ int main(void)
 
 	if (rx_data_ready == 1) {
 		char extracted_message[RX_BUFFER_SIZE];
+		uint32_t received_time = 0;
 
 		// Parse the data between the brackets
 		// %31[^}] means "read up to 31 characters, stopping when you hit a '}'"
 		if (sscanf(rx_buffer, "{%31[^}]}", extracted_message) == 1) {
 			printf("Valid message received: %s\r\n", extracted_message);
+
+			// Check if the message is the "jetson" trigger for Car 1
+			if (strcmp(extracted_message, "jetson") == 0) {
+				if (is_racing == 0) {
+					// Start the internal timer for Car 1
+					lap_start_time = HAL_GetTick();
+					is_racing = 1;
+					printf("Car 1 Race Started!\r\n");
+				} else {
+					// Calculate Car 1 lap time based on internal ticks
+					uint32_t current_time = HAL_GetTick();
+					uint32_t lap_time = current_time - lap_start_time;
+
+					// Reset the start time for the next lap
+					lap_start_time = current_time;
+
+					// Record and update screen
+					record_lap(1, lap_time);
+					update_lcd_display();
+					printf("Car 1 Lap Recorded: %lu ms\r\n", lap_time);
+				}
+			}
+			// If not "jetson", check if it is a numeric lap time for Car 2
+			else if (sscanf(extracted_message, "%lu", &received_time) == 1) {
+				// Record the parsed time for Car 2 and update screen
+				record_lap(2, received_time);
+				update_lcd_display();
+				printf("Car 2 Lap Recorded: %lu ms\r\n", received_time);
+			}
+			else {
+				// Handle unknown bracketed messages
+				printf("Unknown command received: %s\r\n", extracted_message);
+			}
+
 		} else {
 			printf("Invalid format received: %s\r\n", rx_buffer);
 		}
@@ -1064,6 +1101,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 //		}
 //	}
 //}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART3) {
+        // Re-arm the interrupt so we don't go deaf
+        HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+    }
+}
 
 /* USER CODE END 4 */
 
