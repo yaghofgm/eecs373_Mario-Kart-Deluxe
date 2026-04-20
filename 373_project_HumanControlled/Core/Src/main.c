@@ -207,6 +207,9 @@ int main(void)
 	extern const uint8_t green [][7]; // (PFL; 1)
 	extern const uint8_t yellow [][7]; // (FL; 2)
 	extern const uint8_t purple [][7]; // (Power Up; 3)
+	// Lap Time
+	int reset_color = 0;
+	int reset_start_time = 0;
 
 	// Set LED to White
 	for(int i = 0; i < 15; i++){
@@ -235,12 +238,30 @@ int main(void)
 			if(type_tag == 1){
 			  if(lap_latch == 0){
 				  lap_latch = 1;
+				  printf("Practice PFL\n\r");
+
+				  	 // Set LED to Red
+				  	for(int i = 0; i < 15; i++){
+				  		ws2812_set_pixel(i,255,0,0);
+				  	}
+				  	ws2812_show();
+				  	reset_color = 1;
+				  	reset_start_time = HAL_GetTick();
 			  }
 			}
 			// Yellow (Finish Line)
 			else if(type_tag == 2){
 			  if(lap_latch == 1){
 				  lap_latch = 2;
+				  printf("Practice FL\n\r");
+
+				  // Set LED to Green
+				  	for(int i = 0; i < 15; i++){
+				  		ws2812_set_pixel(i,0,255,0);
+				  	}
+				  	ws2812_show();
+				  	reset_color = 1;
+				  	reset_start_time = HAL_GetTick();
 			  }
 			}
 			// Blue (Power-Up)
@@ -279,6 +300,7 @@ int main(void)
 			  if(start_timer == 1){
 				  // Start Lap Time
 				  lap_start_time = HAL_GetTick();
+				  printf("Practice Start Timer\n\r");
 
 				  // Change Latches
 				  start_timer = 0;
@@ -292,8 +314,10 @@ int main(void)
 
 				  // Send Time to Controller
 				  char lap_time_buffer[20];
-				  sprintf(lap_time_buffer,"%d",lap_time);
+				  sprintf(lap_time_buffer,"{%d}\n\r",lap_time);
 				  USART3_SendString_IT(lap_time_buffer);
+				  printf("Practice End Timer\n\r");
+				  printf(lap_time_buffer);
 
 				  // Change Latches
 				  start_timer = 1;
@@ -324,11 +348,11 @@ int main(void)
 	      // It returns the number of variables successfully found.
 	      if (sscanf(rx_buffer, "{%d,%d}", &speed, &w) == 2) {
 	    	  // Successfully parsed both integers!
-	          printf("Success! Speed: %d, W: %d\r\n", speed, w);
+	          //printf("Success! Speed: %d, W: %d\r\n", speed, w);
 
 	          // You can now call drive(w, speed); here if you bring that function over
 	      } else if (strcmp(rx_buffer, "{STARMAN}") == 0) {
-	          printf("STARMAN Received: %s\r\n", rx_buffer);
+	          //printf("STARMAN Received: %s\r\n", rx_buffer);
 	          if(power_up){
 	        	  boost_start_time = HAL_GetTick();
 	        	  boost_current_time = HAL_GetTick();
@@ -371,6 +395,30 @@ int main(void)
 			  	ws2812_set_pixel(i,255,255,255);
 			  }
 			  ws2812_show();
+		  }
+	  }
+
+	  if(reset_color){
+		  if( (HAL_GetTick() - reset_start_time) > 2000 ){
+			  if(power_up){
+				  // Set Yellow
+				  for(int i = 0; i < 15; i++){
+				  	ws2812_set_pixel(i,255,255,0);
+				  }
+				  ws2812_show();
+			  }
+			  else if(boost_on){
+				  // Set Rainbow
+				  doStar();
+			  }
+			  else{
+				  // Set White
+				  for(int i = 0; i < 15; i++){
+				  	ws2812_set_pixel(i,255,255,255);
+				  }
+				  ws2812_show();
+			  }
+			  reset_color = 0;
 		  }
 	  }
 
